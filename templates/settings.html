@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Paramètres - AgendaPro{% endblock %}
+{% block header_title %}Paramètres{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-8">
+
+    <!-- Tab Navigation -->
+    <div class="flex border-b border-slate-200">
+        <button id="tab-profile"
+            class="px-6 py-3 text-indigo-600 font-medium border-b-2 border-indigo-600 transition-colors">Mon
+            Profil</button>
+        <button id="tab-users"
+            class="px-6 py-3 text-slate-500 font-medium hover:text-slate-700 transition-colors hidden">Gestion
+            Utilisateurs</button>
+    </div>
+
+    <!-- Profile Section -->
+    <section id="section-profile" class="space-y-6">
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
+            <h3 class="text-xl font-bold text-slate-800 mb-4">Mes informations</h3>
+            <form id="profile-form" class="max-w-md space-y-4 mb-8 pb-8 border-b border-slate-100">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Prénom</label>
+                        <input type="text" name="first_name" id="input-first-name"
+                            class="w-full rounded-lg border-slate-200 bg-slate-50 px-4 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-slate-700 mb-1">Nom</label>
+                        <input type="text" name="last_name" id="input-last-name"
+                            class="w-full rounded-lg border-slate-200 bg-slate-50 px-4 py-2">
+                    </div>
+                </div>
+                <button type="submit"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                    Enregistrer
+                </button>
+            </form>
+
+            <h3 class="text-xl font-bold text-slate-800 mb-4">Changer mon mot de passe</h3>
+            <form id="password-form" class="max-w-md space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Mot de passe actuel</label>
+                    <input type="password" name="current_password" required
+                        class="w-full rounded-lg border-slate-200 bg-slate-50 px-4 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nouveau mot de passe</label>
+                    <input type="password" name="new_password" required
+                        class="w-full rounded-lg border-slate-200 bg-slate-50 px-4 py-2">
+                </div>
+                <button type="submit"
+                    class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                    Modifier
+                </button>
+            </form>
+        </div>
+    </section>
+
+    <!-- Users Management Section (Admin Only) -->
+    <section id="section-users" class="hidden space-y-6">
+        <div class="flex justify-end">
+            <button onclick="openUserModal()"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-4 rounded-lg shadow-sm flex items-center gap-2">
+                <i class="fas fa-plus"></i> Nouvel Utilisateur
+            </button>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <table class="w-full text-left text-sm text-slate-600">
+                <thead class="bg-slate-50 text-slate-800 font-semibold border-b border-slate-200">
+                    <tr>
+                        <th class="px-6 py-4">Email</th>
+                        <th class="px-6 py-4">Rôle</th>
+                        <th class="px-6 py-4">Statut</th>
+                        <th class="px-6 py-4 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="users-table-body" class="divide-y divide-slate-100">
+                    <!-- Populated via JS -->
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+
+<!-- User Modal -->
+<div id="user-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="text-xl font-bold text-slate-800">Ajouter un utilisateur</h3>
+            <button onclick="closeUserModal()" class="text-slate-400 hover:text-slate-600"><i
+                    class="fas fa-times"></i></button>
+        </div>
+        <form id="user-form" class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                <input type="email" name="email" required
+                    class="w-full rounded-lg border-slate-200 bg-slate-50 px-4 py-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Mot de passe</label>
+                <input type="password" name="password" required
+                    class="w-full rounded-lg border-slate-200 bg-slate-50 px-4 py-2">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Rôle</label>
+                <select name="role" class="w-full rounded-lg border-slate-200 bg-slate-50 px-4 py-2">
+                    <option value="user">Utilisateur</option>
+                    <option value="manager">Manager</option>
+                    <option value="admin">Administrateur</option>
+                    <option value="super_admin" id="option-super-admin" disabled>Super Admin (Restricted)</option>
+                </select>
+            </div>
+            <button type="submit"
+                class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg mt-2">
+                Créer
+            </button>
+        </form>
+    </div>
+</div>
+
+<script>
+    const token = localStorage.getItem('token');
+    let currentUser = null;
+
+    // --- Identification & Role Check ---
+    async function checkUser() {
+        try {
+            const res = await fetch('/api/v1/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) {
+                currentUser = await res.json();
+
+                // Pre-fill Profile Form
+                document.getElementById('input-first-name').value = currentUser.first_name || '';
+                document.getElementById('input-last-name').value = currentUser.last_name || '';
+
+                // Show Users tab if Admin+
+                if (['admin', 'super_admin'].includes(currentUser.role)) {
+                    document.getElementById('tab-users').classList.remove('hidden');
+                }
+
+                // Enable Super Admin option in modal if applicable
+                if (currentUser.role === 'super_admin') {
+                    document.getElementById('option-super-admin').disabled = false;
+                }
+
+                // Initial Load
+                if (window.location.hash === '#users' && ['admin', 'super_admin'].includes(currentUser.role)) {
+                    switchTab('users');
+                }
+            }
+        } catch (e) { console.error(e); }
+    }
+    checkUser();
+
+    // --- Tabs ---
+    const tabProfile = document.getElementById('tab-profile');
+    const tabUsers = document.getElementById('tab-users');
+    const sectionProfile = document.getElementById('section-profile');
+    const sectionUsers = document.getElementById('section-users');
+
+    function switchTab(tab) {
+        if (tab === 'profile') {
+            tabProfile.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
+            tabProfile.classList.remove('text-slate-500');
+            tabUsers.classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600');
+            tabUsers.classList.add('text-slate-500');
+            sectionProfile.classList.remove('hidden');
+            sectionUsers.classList.add('hidden');
+        } else {
+            tabUsers.classList.add('text-indigo-600', 'border-b-2', 'border-indigo-600');
+            tabUsers.classList.remove('text-slate-500');
+            tabProfile.classList.remove('text-indigo-600', 'border-b-2', 'border-indigo-600');
+            tabProfile.classList.add('text-slate-500');
+            sectionUsers.classList.remove('hidden');
+            sectionProfile.classList.add('hidden');
+            loadUsers();
+        }
+    }
+
+    tabProfile.onclick = () => switchTab('profile');
+    tabUsers.onclick = () => switchTab('users');
+
+    tabUsers.onclick = () => switchTab('users');
+
+    // --- Profile Update ---
+    document.getElementById('profile-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const json = Object.fromEntries(new FormData(e.target).entries());
+
+        try {
+            const res = await fetch('/api/v1/users/me/profile', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(json)
+            });
+            if (res.ok) {
+                alert('Profil mis à jour !');
+                // Refresh to update sidebar
+                window.location.reload();
+            }
+            else { alert('Erreur: ' + (await res.json()).detail); }
+        } catch (err) { alert('Erreur réseau'); }
+    };
+    document.getElementById('password-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const json = Object.fromEntries(new FormData(e.target).entries());
+
+        try {
+            const res = await fetch('/api/v1/users/me/password', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(json)
+            });
+            if (res.ok) { alert('Mot de passe modifié !'); e.target.reset(); }
+            else { alert('Erreur: ' + (await res.json()).detail); }
+        } catch (err) { alert('Erreur réseau'); }
+    };
+
+    // --- User Management ---
+    async function loadUsers() {
+        const tbody = document.getElementById('users-table-body');
+        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4">Chargement...</td></tr>';
+
+        try {
+            const res = await fetch('/api/v1/users/', { headers: { 'Authorization': `Bearer ${token}` } });
+            const users = await res.json();
+
+            tbody.innerHTML = users.map(u => `
+                <tr class="hover:bg-slate-50 transition-colors">
+                    <td class="px-6 py-4 font-medium">${u.email}</td>
+                    <td class="px-6 py-4">
+                        ${currentUser.role === 'super_admin' && u.id !== currentUser.id ?
+                    `<select onchange="updateRole(${u.id}, this.value)" class="bg-white border border-slate-200 rounded text-xs py-1">
+                             <option value="user" ${u.role === 'user' ? 'selected' : ''}>User</option>
+                             <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>Manager</option>
+                             <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                             <option value="super_admin" ${u.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
+                           </select>`
+                    :
+                    `<span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold uppercase">${u.role}</span>`
+                }
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="w-2 h-2 rounded-full inline-block ${u.is_active ? 'bg-emerald-500' : 'bg-red-500'} mr-2"></span>
+                        ${u.is_active ? 'Actif' : 'Inactif'}
+                    </td>
+                    <td class="px-6 py-4 text-right">
+                         ${u.id !== currentUser.id && (currentUser.role === 'super_admin' || (currentUser.role === 'admin' && u.role !== 'super_admin')) ?
+                    `<button onclick="deleteUser(${u.id})" class="text-red-500 hover:text-red-700 bg-red-50 p-2 rounded transition-colors"><i class="fas fa-trash"></i></button>`
+                    : ''
+                }
+                    </td>
+                </tr>
+            `).join('');
+        } catch (err) { tbody.innerHTML = '<tr><td colspan="4" class="text-center text-red-500 py-4">Erreur chargement</td></tr>'; }
+    }
+
+    async function deleteUser(id) {
+        if (!confirm("Supprimer cet utilisateur ?")) return;
+        try {
+            const res = await fetch(`/api/v1/users/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) loadUsers();
+            else alert("Erreur: " + (await res.json()).detail);
+        } catch (err) { alert('Erreur réseau'); }
+    }
+
+    async function updateRole(id, newRole) {
+        if (!confirm(`Changer le rôle en ${newRole} ?`)) return loadUsers(); // Reset if cancel
+        try {
+            const res = await fetch(`/api/v1/users/${id}/role`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify({ role: newRole })
+            });
+            if (res.ok) loadUsers();
+            else { alert("Erreur: " + (await res.json()).detail); loadUsers(); }
+        } catch (err) { alert('Erreur réseau'); loadUsers(); }
+    }
+
+    // --- Modal ---
+    const modal = document.getElementById('user-modal');
+    window.openUserModal = () => modal.classList.remove('hidden');
+    window.closeUserModal = () => modal.classList.add('hidden');
+
+    document.getElementById('user-form').onsubmit = async (e) => {
+        e.preventDefault();
+        const json = Object.fromEntries(new FormData(e.target).entries());
+        try {
+            const res = await fetch('/api/v1/users/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                body: JSON.stringify(json)
+            });
+            if (res.ok) { closeUserModal(); e.target.reset(); loadUsers(); }
+            else { alert("Erreur: " + (await res.json()).detail); }
+        } catch (err) { alert('Erreur réseau'); }
+    }
+</script>
+{% endblock %}

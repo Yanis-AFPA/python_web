@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 from app.models.user import User
@@ -9,6 +9,8 @@ class Event(Base):
     description = Column(Text, nullable=True)
     start_date = Column(DateTime, nullable=False)
     end_date = Column(DateTime, nullable=False)
+    is_public = Column(Boolean, default=False)
+    is_approved = Column(Boolean, default=False)
     
 
     owner_id = Column(Integer, ForeignKey("user.id"), nullable=True) # Nullable for migration/existing data for now

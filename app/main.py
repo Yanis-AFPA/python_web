@@ -3,7 +3,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.routers import events, auth
+from app.routers import events, auth, users
 from app.db.session import engine, AsyncSessionLocal
 from app.db.base_class import Base
 from app.db.init_db import init_db
@@ -40,6 +40,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Routers
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
+app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
 app.include_router(events.router, prefix="/events", tags=["events"])
 
 # Templates (Simple viewing)
@@ -52,6 +53,10 @@ async def calendar_page(request: Request):
 @app.get("/login")
 async def login_page(request: Request):
     return templates.TemplateResponse("login.html", {"request": request})
+
+@app.get("/settings")
+async def settings_page(request: Request):
+    return templates.TemplateResponse("settings.html", {"request": request})
 
 @app.get("/")
 async def index(request: Request):

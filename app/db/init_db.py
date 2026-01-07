@@ -12,11 +12,17 @@ async def init_db(db: AsyncSession) -> None:
         user = User(
             email="admin@example.com",
             hashed_password=security.get_password_hash("P@ssw0rd"),
-            role=UserRole.ADMIN,
+            role=UserRole.SUPER_ADMIN,
             is_active=True,
         )
         db.add(user)
         await db.commit()
-        print("--- Default Admin Created (admin@example.com / P@ssw0rd) ---")
+        print("--- Default Super Admin Created (admin@example.com / P@ssw0rd) ---")
     else:
+        # Upgrade existing admin if needed (optional, but good for dev)
+        if user.role != UserRole.SUPER_ADMIN:
+            user.role = UserRole.SUPER_ADMIN
+            db.add(user)
+            await db.commit()
+            print("--- Upgraded existing admin to Super Admin ---")
         print("--- Default Admin already exists ---")

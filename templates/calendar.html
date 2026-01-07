@@ -103,6 +103,13 @@
                     class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
             </div>
 
+            <div class="flex items-center gap-2">
+                <input type="checkbox" name="is_public" id="input-is-public"
+                    class="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
+                <label for="input-is-public" class="text-sm font-medium text-slate-700">Visibilité Publique (Soumis à
+                    validation)</label>
+            </div>
+
             <div class="pt-2">
                 <button type="submit"
                     class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl shadow-lg shadow-indigo-500/20 transition-all transform active:scale-95">
@@ -110,6 +117,19 @@
                 </button>
             </div>
         </form>
+    </div>
+</div>
+
+<!-- View/Approve Modal -->
+<div id="view-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative">
+        <button onclick="closeViewModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i
+                class="fas fa-times"></i></button>
+
+        <div id="view-content" class="space-y-4">
+            <!-- Populated via JS -->
+        </div>
     </div>
 </div>
 
@@ -131,7 +151,7 @@
             height: '100%',
             events: function (info, successCallback, failureCallback) {
                 const token = localStorage.getItem('token');
-                fetch('/events', {
+                fetch('/events/', {
                     headers: {
                         'Authorization': `Bearer ${token}`
                     }
@@ -146,15 +166,36 @@
                     .then(data => {
                         if (!data) return; // Redirected
                         // Map backend events to FullCalendar format
-                        const events = data.map(event => ({
-                            title: event.title,
-                            start: event.start_date,
-                            end: event.end_date,
-                            extendedProps: {
-                                description: event.description,
-                                files: event.files
+                        const events = data.map(event => {
+                            let color = '#3b82f6'; // Default Blue (Private/Standard)
+                            let borderColor = '#2563eb';
+
+                            if (event.is_public) {
+                                if (event.is_approved) {
+                                    color = '#10b981'; // Green (Approved Public)
+                                    borderColor = '#059669';
+                                } else {
+                                    color = '#f59e0b'; // Orange (Pending Public)
+                                    borderColor = '#d97706';
+                                }
                             }
-                        }));
+
+                            return {
+                                id: event.id,
+                                title: event.title,
+                                start: event.start_date,
+                                end: event.end_date,
+                                backgroundColor: color,
+                                borderColor: borderColor,
+                                extendedProps: {
+                                    description: event.description,
+                                    files: event.files,
+                                    is_public: event.is_public,
+                                    is_approved: event.is_approved,
+                                    owner_id: event.owner_id
+                                }
+                            };
+                        });
                         successCallback(events);
                     })
                     .catch(error => {
@@ -163,12 +204,7 @@
                     });
             },
             eventClick: function (info) {
-                const props = info.event.extendedProps;
-                let msg = `Event: ${info.event.title}\nDesc: ${props.description || 'N/A'}`;
-                if (props.files && props.files.length > 0) {
-                    msg += `\nFiles: ${props.files.length} attached`;
-                }
-                alert(msg);
+                openViewModal(info.event);
             },
             dateClick: function (info) {
                 openModal();
@@ -254,6 +290,92 @@
                 alert('Erreur réseau');
             }
         });
+        // --- View Modal Logic ---
+        const viewModal = document.getElementById('view-modal');
+        const viewContent = document.getElementById('view-content');
+        let currentUser = null;
+
+        // Fetch current user for permission check
+        fetch('/api/v1/auth/me', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
+            .then(res => res.json())
+            .then(u => currentUser = u);
+
+        window.openViewModal = (event) => {
+            const props = event.extendedProps;
+            const isManager = currentUser && ['admin', 'manager', 'super_admin'].includes(currentUser.role);
+            const canApprove = isManager && props.is_public && !props.is_approved;
+
+            let html = `
+                <h3 class="text-xl font-bold text-slate-800">${event.title}</h3>
+                <div class="flex items-center gap-2 text-sm">
+                    <span class="px-2 py-0.5 rounded text-white ${props.is_public ? (props.is_approved ? 'bg-emerald-500' : 'bg-amber-500') : 'bg-blue-500'}">
+                        ${props.is_public ? (props.is_approved ? 'Public (Approuvé)' : 'Public (En attente)') : 'Privé'}
+                    </span>
+                    <span class="text-slate-500">${new Date(event.start).toLocaleString()}</span>
+                </div>
+                <p class="text-slate-600 bg-slate-50 p-3 rounded-lg">${props.description || 'Aucune description'}</p>
+            `;
+
+            if (props.files && props.files.length > 0) {
+                html += `<div class="border-t pt-2 mt-2">
+                    <p class="font-semibold text-sm mb-1">Fichiers:</p>
+                    ${props.files.map(f => `<a href="${f.file_path}" target="_blank" class="text-indigo-600 hover:underline block text-sm"><i class="fas fa-paperclip"></i> ${f.file_name}</a>`).join('')}
+                </div>`;
+            }
+
+            // Actions
+            html += `<div class="flex gap-2 mt-4 pt-2 border-t border-slate-100">`;
+
+            if (canApprove) {
+                html += `<button onclick="approveEvent(${event.id})" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-bold">Approuver</button>`;
+            }
+
+            // Delete (Owner or Admin)
+            const isOwner = currentUser && currentUser.id === props.owner_id;
+            if (isOwner || isManager) {
+                html += `<button onclick="deleteEvent(${event.id})" class="flex-1 bg-red-100 hover:bg-red-200 text-red-600 py-2 rounded-lg font-bold">Supprimer</button>`;
+            }
+
+            html += `</div>`;
+
+            viewContent.innerHTML = html;
+            viewModal.classList.remove('hidden');
+        };
+
+        window.closeViewModal = () => viewModal.classList.add('hidden');
+
+        window.approveEvent = async (id) => {
+            if (!confirm("Valider cet événement public ?")) return;
+            try {
+                const res = await fetch(`/events/${id}/approve`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (res.ok) {
+                    closeViewModal();
+                    calendar.refetchEvents();
+                    alert("Evénement approuvé !");
+                } else {
+                    const err = await res.json();
+                    alert("Erreur: " + (err.detail || "Inconnue"));
+                }
+            } catch (e) { console.error(e); }
+        };
+
+        window.deleteEvent = async (id) => {
+            if (!confirm("Supprimer cet événement ?")) return;
+            try {
+                const res = await fetch(`/events/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (res.ok) {
+                    closeViewModal();
+                    calendar.refetchEvents();
+                } else alert("Erreur");
+            } catch (e) { console.error(e); }
+        };
+
     });
 </script>
 {% endblock %}

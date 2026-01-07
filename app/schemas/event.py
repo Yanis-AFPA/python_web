@@ -18,12 +18,14 @@ class EventBase(BaseModel):
     description: Optional[str] = None
     start_date: datetime
     end_date: datetime
+    is_public: bool = False
 
 class EventCreate(EventBase):
     pass
 
 class Event(EventBase):
     id: int
+    is_approved: bool # Read only
     files: List[EventFile] = []
 
     class Config:
