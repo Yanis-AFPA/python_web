@@ -8,8 +8,8 @@ from sqlalchemy import select
 from app.db.session import get_db
 from app.core import security, auth
 from app.core.config import settings
-from app.core.deps import get_current_active_user
-from app.models.user import User
+from app.core.deps import get_current_active_user, get_current_user
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserResponse, Token
 
 router = APIRouter()
@@ -41,8 +41,16 @@ async def login_access_token(
 @router.post("/register", response_model=UserResponse)
 async def register_user(
     user_in: UserCreate,
+    current_user: User = Depends(get_current_active_user), # Require Auth
     db: AsyncSession = Depends(get_db)
 ) -> Any:
+    # Check if current user is admin
+    if current_user.role != UserRole.ADMIN:
+        raise HTTPException(
+            status_code=403,
+            detail="Current user doesn't have enough privileges",
+        )
+    
     # Check if user exists
     result = await db.execute(select(User).where(User.email == user_in.email))
     existing_user = result.scalar_one_or_none()

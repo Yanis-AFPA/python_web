@@ -4,14 +4,20 @@ from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.routers import events, auth
-from app.db.session import engine
+from app.db.session import engine, AsyncSessionLocal
 from app.db.base_class import Base
+from app.db.init_db import init_db
 
 # Create tables on startup (for prototype simplicity)
 # In production, use Alembic
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+    
+    # Init DB (Seed Admin)
+    async with AsyncSessionLocal() as session:
+        await init_db(session)
+        
     yield
 
 app = FastAPI(
