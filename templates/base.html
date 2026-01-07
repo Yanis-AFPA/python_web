@@ -127,51 +127,53 @@
     </main>
 
     <script>
-        // Logout
-        const btnLogout = document.getElementById('btn-logout');
-        if (btnLogout) {
-            btnLogout.addEventListener('click', () => {
-                localStorage.removeItem('token');
-                window.location.href = '/login';
-            });
-        }
-
-        // Fetch user info for Sidebar (if logged in)
-        const token = localStorage.getItem('token');
-        const isLoginPage = window.location.pathname === '/login' || window.location.pathname === '/' || window.location.pathname === '/register';
-
-        if (token && !isLoginPage) {
-            fetch('/api/v1/auth/me', { headers: { 'Authorization': `Bearer ${token}` } })
-                .then(res => {
-                    if (res.ok) return res.json();
-                    throw new Error("Invalid token");
-                })
-                .then(user => {
-                    // Show Profile Section
-                    const profileSection = document.getElementById('sidebar-profile');
-                    if (profileSection) profileSection.classList.remove('invisible');
-
-                    const nameDisplay = document.getElementById('sidebar-user-name');
-                    if (nameDisplay) {
-                        if (user.first_name || user.last_name) {
-                            let roleLabel = user.role;
-                            if (roleLabel === 'manager') roleLabel = 'Médecin';
-                            if (roleLabel === 'user') roleLabel = 'Secrétaire';
-                            if (roleLabel === 'admin') roleLabel = 'Directeur';
-                            if (roleLabel === 'super_admin') roleLabel = 'Directeur';
-
-                            nameDisplay.innerHTML = `${user.first_name || ''} ${user.last_name || ''}<br><span class="text-xs text-slate-400 font-normal">${roleLabel}</span>`;
-                        } else {
-                            nameDisplay.textContent = user.email.split('@')[0];
-                        }
-                    }
-                })
-                .catch(err => {
-                    console.error("Auth check failed", err);
+        (() => {
+            // Logout
+            const btnLogout = document.getElementById('btn-logout');
+            if (btnLogout) {
+                btnLogout.addEventListener('click', () => {
                     localStorage.removeItem('token');
                     window.location.href = '/login';
                 });
-        }
+            }
+
+            // Fetch user info for Sidebar (if logged in)
+            const token = localStorage.getItem('token');
+            const isLoginPage = window.location.pathname === '/login' || window.location.pathname === '/' || window.location.pathname === '/register';
+
+            if (token && !isLoginPage) {
+                fetch('/api/v1/auth/me', { headers: { 'Authorization': `Bearer ${token}` } })
+                    .then(res => {
+                        if (res.ok) return res.json();
+                        throw new Error("Invalid token");
+                    })
+                    .then(user => {
+                        // Show Profile Section
+                        const profileSection = document.getElementById('sidebar-profile');
+                        if (profileSection) profileSection.classList.remove('invisible');
+
+                        const nameDisplay = document.getElementById('sidebar-user-name');
+                        if (nameDisplay) {
+                            if (user.first_name || user.last_name) {
+                                let roleLabel = user.role;
+                                if (roleLabel === 'manager') roleLabel = 'Médecin';
+                                if (roleLabel === 'user') roleLabel = 'Secrétaire';
+                                if (roleLabel === 'admin') roleLabel = 'Directeur';
+                                if (roleLabel === 'super_admin') roleLabel = 'Directeur';
+
+                                nameDisplay.innerHTML = `${user.first_name || ''} ${user.last_name || ''}<br><span class="text-xs text-slate-400 font-normal">${roleLabel}</span>`;
+                            } else {
+                                nameDisplay.textContent = user.email.split('@')[0];
+                            }
+                        }
+                    })
+                    .catch(err => {
+                        console.error("Auth check failed", err);
+                        localStorage.removeItem('token');
+                        window.location.href = '/login';
+                    });
+            }
+        })();
     </script>
 
     {% block scripts %}{% endblock %}
