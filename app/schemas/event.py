@@ -2,6 +2,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
 from app.schemas.patient import Patient
+from app.schemas.user import UserBase # Basic user info
 
 class EventFileBase(BaseModel):
     file_name: str
@@ -31,6 +32,7 @@ class Event(EventBase):
     is_approved: bool # Read only
     files: List[EventFile] = []
     patient: Optional[Patient] = None
+    owner: Optional[UserBase] = None
 
     class Config:
         from_attributes = True

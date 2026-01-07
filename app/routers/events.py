@@ -33,7 +33,8 @@ async def read_events(
     # from app.models.patient import Patient as PatientModel # Moved global
     query = select(EventModel).options(
         selectinload(EventModel.files), 
-        selectinload(EventModel.patient).selectinload(PatientModel.files)
+        selectinload(EventModel.patient).selectinload(PatientModel.files),
+        selectinload(EventModel.owner)
     )
     
     # RBAC Visibility Logic
@@ -110,6 +111,20 @@ async def create_event(
          # External / Patient (not implemented yet)
          db_event.is_approved = False
     
+    # Conflict Detection: Prevent Doctor overlap
+    # If explicitly assigned (or auto-assigned to self), check conflicts for that owner_id
+    if db_event.owner_id:
+        # Check overlapping events for this doctor
+        # New Start < Existing End AND New End > Existing Start
+        conflict_query = select(EventModel).where(
+            EventModel.owner_id == db_event.owner_id,
+            EventModel.start_date < end_date,
+            EventModel.end_date > start_date
+        )
+        result = await db.execute(conflict_query)
+        if result.scalars().first():
+             raise HTTPException(status_code=400, detail="Docteur indisponible sur ce créneau (chevauchement)")
+
     db.add(db_event)
     await db.commit()
     await db.refresh(db_event)

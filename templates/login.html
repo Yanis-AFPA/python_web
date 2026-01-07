@@ -45,7 +45,9 @@
     // Login logic
     formLogin.onsubmit = async (e) => {
         e.preventDefault();
-        const formData = new FormData(formLogin);
+        const formData = new FormData();
+        formData.append('username', formLogin.username.value.trim());
+        formData.append('password', formLogin.password.value.trim());
 
         try {
             const res = await fetch('/api/v1/auth/login', {

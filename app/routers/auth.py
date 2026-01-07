@@ -20,7 +20,8 @@ async def login_access_token(
     db: AsyncSession = Depends(get_db)
 ) -> Any:
     """OAuth2 compatible token login, get an access token for future requests"""
-    result = await db.execute(select(User).where(User.email == form_data.username))
+    # Ensure case-insensitive header
+    result = await db.execute(select(User).where(User.email == form_data.username.lower()))
     user = result.scalar_one_or_none()
     
     if not user or not security.verify_password(form_data.password, user.hashed_password):
