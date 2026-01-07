@@ -102,6 +102,18 @@
                 <input type="email" name="email" required
                     class="w-full rounded-lg border-slate-200 bg-slate-50 px-4 py-2">
             </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Prénom</label>
+                    <input type="text" name="first_name" required
+                        class="w-full rounded-lg border-slate-200 bg-slate-50 px-4 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nom</label>
+                    <input type="text" name="last_name" required
+                        class="w-full rounded-lg border-slate-200 bg-slate-50 px-4 py-2">
+                </div>
+            </div>
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Mot de passe</label>
                 <input type="password" name="password" required
@@ -110,9 +122,9 @@
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Rôle</label>
                 <select name="role" class="w-full rounded-lg border-slate-200 bg-slate-50 px-4 py-2">
-                    <option value="user">Utilisateur</option>
-                    <option value="manager">Manager</option>
-                    <option value="admin">Administrateur</option>
+                    <option value="user">Secrétaire</option>
+                    <option value="manager">Médecin</option>
+                    <option value="admin">Directeur</option>
                     <option value="super_admin" id="option-super-admin" disabled>Super Admin (Restricted)</option>
                 </select>
             </div>
@@ -237,13 +249,16 @@
                     <td class="px-6 py-4">
                         ${currentUser.role === 'super_admin' && u.id !== currentUser.id ?
                     `<select onchange="updateRole(${u.id}, this.value)" class="bg-white border border-slate-200 rounded text-xs py-1">
-                             <option value="user" ${u.role === 'user' ? 'selected' : ''}>User</option>
-                             <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>Manager</option>
-                             <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                            
+                             <option value="user" ${u.role === 'user' ? 'selected' : ''}>Secrétaire (User)</option>
+                             <option value="manager" ${u.role === 'manager' ? 'selected' : ''}>Médecin (Manager)</option>
+                             <option value="admin" ${u.role === 'admin' ? 'selected' : ''}>Directeur (Admin)</option>
                              <option value="super_admin" ${u.role === 'super_admin' ? 'selected' : ''}>Super Admin</option>
                            </select>`
                     :
-                    `<span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold uppercase">${u.role}</span>`
+                    `<span class="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-bold uppercase">
+                        ${u.role === 'user' ? 'Secrétaire' : (u.role === 'manager' ? 'Médecin' : (u.role === 'admin' ? 'Directeur' : u.role))}
+                    </span>`
                 }
                     </td>
                     <td class="px-6 py-4">

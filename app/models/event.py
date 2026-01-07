@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, String, DateTime, Text, ForeignKey, Bool
 from sqlalchemy.orm import relationship
 from app.db.base_class import Base
 from app.models.user import User
+from app.models.patient import Patient
 
 class Event(Base):
     id = Column(Integer, primary_key=True, index=True)
@@ -12,10 +13,13 @@ class Event(Base):
     is_public = Column(Boolean, default=False)
     is_approved = Column(Boolean, default=False)
     
+    # New MediTrack Fields
+    event_type = Column(String, default="consultation") # consultation, surgery, meeting
+    patient_id = Column(Integer, ForeignKey("patient.id"), nullable=True)
 
     owner_id = Column(Integer, ForeignKey("user.id"), nullable=True) # Nullable for migration/existing data for now
     owner = relationship("User", back_populates="events")
-    
+    patient = relationship("Patient", back_populates="events")
     files = relationship("EventFile", back_populates="event", cascade="all, delete-orphan")
 
 class EventFile(Base):

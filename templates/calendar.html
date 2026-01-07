@@ -74,20 +74,51 @@
         <form id="event-form" class="p-6 space-y-5">
             <div>
                 <label class="block text-sm font-medium text-slate-700 mb-1">Titre</label>
-                <input type="text" name="title" required
-                    class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors bg-slate-50 px-4 py-2.5 text-sm">
+                <input type="text" name="title" id="eventTitle" required
+                    class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Type de RDV</label>
+                    <select name="event_type" id="eventType"
+                        class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm">
+                        <option value="consultation">Consultation</option>
+                        <option value="surgery">Chirurgie / Bloc</option>
+                        <option value="meeting">Réunion / Staff</option>
+                        <option value="other">Autre</option>
+                    </select>
+                </div>
+                <!-- Doctor Select: Hidden by default, shown for Admin/Secretary -->
+                <div id="doctorField" class="hidden">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Médecin</label>
+                    <select name="owner_id" id="eventDoctor"
+                        class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm">
+                        <option value="">-- Assigner --</option>
+                        <!-- Populated JS -->
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Patient</label>
+                <select name="patient_id" id="eventPatient"
+                    class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm">
+                    <option value="">-- Aucun / Personnel --</option>
+                    <!-- Populated via JS -->
+                </select>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Début</label>
-                    <input type="datetime-local" name="start_date" required
-                        class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors bg-slate-50 px-4 py-2.5 text-sm">
+                    <input type="datetime-local" name="start_date" id="eventStart" required
+                        class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm">
                 </div>
                 <div>
                     <label class="block text-sm font-medium text-slate-700 mb-1">Fin</label>
-                    <input type="datetime-local" name="end_date" required
-                        class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors bg-slate-50 px-4 py-2.5 text-sm">
+                    <input type="datetime-local" name="end_date" id="eventEnd" required
+                        class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm">
                 </div>
             </div>
 
@@ -97,7 +128,7 @@
                     class="w-full rounded-lg border-slate-200 focus:border-indigo-500 focus:ring-indigo-500 transition-colors bg-slate-50 px-4 py-2.5 text-sm"></textarea>
             </div>
 
-            <div>
+            <div id="field-file-upload">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Pièce jointe</label>
                 <input type="file" name="file"
                     class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100">
@@ -137,7 +168,69 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function () {
+    document.addEventListener('DOMContentLoaded', async function () {
+        const token = localStorage.getItem('token');
+
+        // Populate Patients Dropdown
+        try {
+            const res = await fetch('/api/v1/patients/', { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) {
+                const patients = await res.json();
+                const patientSelect = document.getElementById('eventPatient');
+                patients.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p.id;
+                    opt.textContent = `${p.last_name} ${p.first_name}`;
+                    patientSelect.appendChild(opt);
+                });
+            }
+        } catch (e) { console.error("Could not load patients", e); }
+
+        // Populate Doctors Dropdown & Check User Role
+        let currentUser = null;
+        try {
+            const res = await fetch('/api/v1/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+            if (res.ok) {
+                currentUser = await res.json();
+
+                // If Secretary (user) or Admin, load doctors and show select
+                if (['user', 'admin', 'super_admin'].includes(currentUser.role)) {
+                    const docField = document.getElementById('doctorField');
+                    if (docField) docField.classList.remove('hidden');
+
+                    const resDoc = await fetch('/api/v1/users/doctors', { headers: { 'Authorization': `Bearer ${token}` } });
+                    if (resDoc.ok) {
+                        const doctors = await resDoc.json();
+                        const docSelect = document.getElementById('eventDoctor');
+                        doctors.forEach(d => {
+                            const opt = document.createElement('option');
+                            opt.value = d.id;
+                            // Fallback if name is null
+                            let label = `Dr. ${d.last_name || ''} ${d.first_name || ''}`.trim();
+                            if (label === 'Dr.') label = `Dr. ${d.email}`; // Fallback to email
+                            if (d.specialty) label += ` (${d.specialty})`;
+
+                            opt.textContent = label;
+                            docSelect.appendChild(opt);
+                        });
+                    }
+                }
+
+                // Hide "Meeting" option for Secretaries
+                const typeSelect = document.getElementById('eventType');
+                for (let i = 0; i < typeSelect.options.length; i++) {
+                    if (typeSelect.options[i].value === 'meeting') {
+                        typeSelect.options[i].disabled = true;
+                        typeSelect.options[i].hidden = true;
+                    }
+                }
+
+                // Hide File Upload for Secretaries
+                const fileInputDiv = document.getElementById('field-file-upload');
+                if (fileInputDiv) fileInputDiv.classList.add('hidden');
+            }
+        } catch (e) { console.error("Role check failed", e); }
+
         // --- FullCalendar Setup ---
         var calendarEl = document.getElementById('calendar');
         var calendar = new FullCalendar.Calendar(calendarEl, {
@@ -192,7 +285,9 @@
                                     files: event.files,
                                     is_public: event.is_public,
                                     is_approved: event.is_approved,
-                                    owner_id: event.owner_id
+                                    owner_id: event.owner_id,
+                                    event_type: event.event_type, // Added event_type
+                                    patient: event.patient // Added patient
                                 }
                             };
                         });
@@ -293,12 +388,7 @@
         // --- View Modal Logic ---
         const viewModal = document.getElementById('view-modal');
         const viewContent = document.getElementById('view-content');
-        let currentUser = null;
-
-        // Fetch current user for permission check
-        fetch('/api/v1/auth/me', { headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` } })
-            .then(res => res.json())
-            .then(u => currentUser = u);
+        // currentUser is already fetched at start of script
 
         window.openViewModal = (event) => {
             const props = event.extendedProps;

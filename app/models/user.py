@@ -17,5 +17,8 @@ class User(Base):
     last_name = Column(String, nullable=True)
     role = Column(String, default=UserRole.USER)
     is_active = Column(Boolean, default=True)
+    
+    # MediTrack
+    specialty = Column(String, nullable=True) # e.g. "Cardiologue", "Infirmier"
 
     events = relationship("Event", back_populates="owner")

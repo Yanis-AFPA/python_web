@@ -4,14 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Enterprise Calendar{% endblock %}</title>
+    <title>{% block title %}MediTrack - Gestion Clinique{% endblock %}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
             theme: {
                 extend: {
                     colors: {
-                        primary: '#4f46e5', // Indigo 600
+                        primary: '#0d9488', // Teal 600
                         secondary: '#64748b', // Slate 500
                     }
                 }
@@ -49,39 +49,53 @@
         <!-- Logo -->
         <div class="h-16 flex items-center px-6 border-b border-slate-800">
             <div class="text-xl font-bold tracking-wide flex items-center gap-2">
-                <i class="fas fa-calendar-check text-indigo-500"></i>
-                <span>Agenda<span class="text-indigo-500">Pro</span></span>
+                <i class="fas fa-heartbeat text-teal-500"></i>
+                <span>Medi<span class="text-teal-500">Track</span></span>
             </div>
         </div>
 
         <!-- Navigation -->
-        <nav class="flex-1 py-6 px-3 space-y-1 overflow-y-auto sidebar-scroll">
-            <a href="#"
+        <nav class="flex-1 py-6 px-3 space-y-1 overflow-y-auto sidebar-scroll" id="sidebar-nav">
+            <a href="/dashboard"
                 class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors group">
-                <i class="fas fa-chart-pie w-5 text-center group-hover:text-indigo-400 transition-colors"></i>
+                <i class="fas fa-chart-pie w-5 text-center group-hover:text-teal-400 transition-colors"></i>
                 <span class="font-medium">Dashboard</span>
             </a>
             <a href="/calendar"
-                class="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-900/20 group">
-                <i class="fas fa-calendar-alt w-5 text-center"></i>
-                <span class="font-medium">Calendrier</span>
-            </a>
-            <a href="#"
                 class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors group">
-                <i class="fas fa-folder w-5 text-center group-hover:text-indigo-400 transition-colors"></i>
-                <span class="font-medium">Fichiers</span>
+                <i class="fas fa-calendar-alt w-5 text-center group-hover:text-teal-400 transition-colors"></i>
+                <span class="font-medium">Calendrier / RDV</span>
+            </a>
+            <a href="/patients"
+                class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors group">
+                <i class="fas fa-folder w-5 text-center group-hover:text-teal-400 transition-colors"></i>
+                <span class="font-medium">Dossiers Médicaux</span>
             </a>
             <a href="/settings"
                 class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors group">
-                <i class="fas fa-cog w-5 text-center group-hover:text-indigo-400 transition-colors"></i>
+                <i class="fas fa-cog w-5 text-center group-hover:text-teal-400 transition-colors"></i>
                 <span class="font-medium">Paramètres</span>
             </a>
         </nav>
+        <script>
+            // Active Link Logic
+            const currentPath = window.location.pathname;
+            const navLinks = document.querySelectorAll('#sidebar-nav a');
+            navLinks.forEach(link => {
+                if (link.getAttribute('href') === currentPath) {
+                    // Remove inactive classes
+                    link.classList.remove('text-slate-400', 'hover:text-white', 'hover:bg-slate-800');
+                    // Add active classes
+                    link.classList.add('bg-teal-600', 'text-white', 'shadow-md', 'shadow-teal-900/20');
+                    // Fix icon color in active state? The icon is fine as white (text-white applies)
+                }
+            });
+        </script>
 
         <!-- User Profile (Bottom) -->
         <div id="sidebar-profile" class="p-4 border-t border-slate-800 invisible">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center text-white font-bold">
+                <div class="w-10 h-10 rounded-full bg-teal-500 flex items-center justify-center text-white font-bold">
                     JD
                 </div>
                 <div>
@@ -140,7 +154,13 @@
                     const nameDisplay = document.getElementById('sidebar-user-name');
                     if (nameDisplay) {
                         if (user.first_name || user.last_name) {
-                            nameDisplay.textContent = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+                            let roleLabel = user.role;
+                            if (roleLabel === 'manager') roleLabel = 'Médecin';
+                            if (roleLabel === 'user') roleLabel = 'Secrétaire';
+                            if (roleLabel === 'admin') roleLabel = 'Directeur';
+                            if (roleLabel === 'super_admin') roleLabel = 'Directeur';
+
+                            nameDisplay.innerHTML = `${user.first_name || ''} ${user.last_name || ''}<br><span class="text-xs text-slate-400 font-normal">${roleLabel}</span>`;
                         } else {
                             nameDisplay.textContent = user.email.split('@')[0];
                         }

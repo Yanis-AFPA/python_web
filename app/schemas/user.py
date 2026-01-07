@@ -10,6 +10,8 @@ class UserBase(BaseModel):
 class UserCreate(UserBase):
     password: str
     role: UserRole = UserRole.USER
+    first_name: str
+    last_name: str
 
 class UserResponse(UserBase):
     id: int

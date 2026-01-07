@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block title %}MediTrack - Patients{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex items-center justify-between">
+        <h2 class="text-2xl font-bold text-slate-800">Gestion des Patients</h2>
+        <button id="btn-new-patient"
+            class="bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition-colors flex items-center gap-2">
+            <i class="fas fa-plus"></i> Nouveau Patient
+        </button>
+    </div>
+
+    <!-- Patients List -->
+    <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <table class="w-full text-left border-collapse">
+            <thead class="bg-slate-50 border-b border-slate-200 text-xs uppercase text-slate-500 font-semibold">
+                <tr>
+                    <th class="p-4">Nom</th>
+                    <th class="p-4">Téléphone</th>
+                    <th class="p-4">Action</th>
+                </tr>
+            </thead>
+            <tbody id="patients-list" class="divide-y divide-slate-100 text-sm text-slate-700">
+                <!-- Populated via JS -->
+                <tr>
+                    <td colspan="3" class="p-4 text-center text-slate-400">Chargement...</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal -->
+<div id="patient-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 relative">
+        <button id="btn-close-modal" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i
+                class="fas fa-times"></i></button>
+
+        <h3 class="text-xl font-bold text-slate-800 mb-4">Nouveau Patient</h3>
+
+        <form id="create-patient-form" class="space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Prénom</label>
+                    <input type="text" name="first_name" required
+                        class="w-full rounded-lg border-slate-200 bg-slate-50 px-3 py-2 focus:ring-2 focus:ring-teal-500">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Nom</label>
+                    <input type="text" name="last_name" required
+                        class="w-full rounded-lg border-slate-200 bg-slate-50 px-3 py-2 focus:ring-2 focus:ring-teal-500">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Téléphone</label>
+                <input type="text" name="phone"
+                    class="w-full rounded-lg border-slate-200 bg-slate-50 px-3 py-2 focus:ring-2 focus:ring-teal-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-slate-700 mb-1">Historique Médical (Optionnel)</label>
+                <textarea name="medical_history" rows="3"
+                    class="w-full rounded-lg border-slate-200 bg-slate-50 px-3 py-2 focus:ring-2 focus:ring-teal-500"></textarea>
+            </div>
+            <button type="submit"
+                class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-2 rounded-lg transition-colors">Créer</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+</script>
+
+<!-- Detail Modal -->
+<div id="detail-modal"
+    class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm hidden">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl p-6 relative max-h-[90vh] overflow-y-auto">
+        <button onclick="closeDetailModal()" class="absolute top-4 right-4 text-slate-400 hover:text-slate-600"><i
+                class="fas fa-times"></i></button>
+
+        <h3 id="detail-name" class="text-2xl font-bold text-slate-800 mb-2"></h3>
+        <p class="text-slate-500 text-sm mb-6 flex gap-4">
+            <span id="detail-phone"><i class="fas fa-phone mr-1"></i> -</span>
+            <span id="detail-email"><i class="fas fa-envelope mr-1"></i> -</span>
+        </p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Medical Info -->
+            <div class="bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <h4 class="font-bold text-slate-700 mb-2">Historique Médical</h4>
+                <p id="detail-history" class="text-slate-600 text-sm whitespace-pre-wrap">Aucun historique.</p>
+            </div>
+
+            <!-- Files -->
+            <div>
+                <h4 class="font-bold text-slate-700 mb-2 flex justify-between items-center">
+                    Documents
+                    <button onclick="triggerFileUpload()"
+                        class="text-xs bg-indigo-100 text-indigo-700 px-2 py-1 rounded hover:bg-indigo-200"><i
+                            class="fas fa-upload"></i> Ajouter</button>
+                </h4>
+                <input type="file" id="file-upload-input" class="hidden" onchange="uploadFile(this.files[0])">
+                <div id="detail-files" class="space-y-2 mt-2">
+                    <!-- File List -->
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    (() => {
+        console.log("MediTrack Patients Script Loading...");
+        const authToken = localStorage.getItem('token');
+        const list = document.getElementById('patients-list');
+        const modal = document.getElementById('patient-modal');
+        const detailModal = document.getElementById('detail-modal');
+        const form = document.getElementById('create-patient-form');
+        const btnNew = document.getElementById('btn-new-patient');
+        const btnClose = document.getElementById('btn-close-modal');
+
+        let currentPatientId = null;
+
+        // Modal Logic
+        function open() { modal.classList.remove('hidden'); }
+        function close() { modal.classList.add('hidden'); }
+
+        if (btnNew) btnNew.addEventListener('click', open);
+        if (btnClose) btnClose.addEventListener('click', close);
+
+        window.closeDetailModal = () => detailModal.classList.add('hidden');
+
+        // Fetch Patients
+        async function loadPatients() {
+            try {
+                const res = await fetch('/api/v1/patients/', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (!res.ok) throw new Error("Failed to fetch");
+                const patients = await res.json();
+
+                if (patients.length === 0) {
+                    list.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-400">Aucun patient trouvé.</td></tr>`;
+                    return;
+                }
+
+                list.innerHTML = patients.map(p => `
+                    <tr class="hover:bg-slate-50 transition-colors">
+                        <td class="p-4 font-medium text-slate-900">${p.first_name} ${p.last_name}</td>
+                        <td class="p-4">${p.phone || '-'}</td>
+                        <td class="p-4">
+                            <button onclick="viewPatient(${p.id})" class="text-teal-600 hover:text-teal-800 font-medium text-xs bg-teal-50 px-2 py-1 rounded">Voir Dossier</button>
+                        </td>
+                    </tr>
+                `).join('');
+            } catch (e) {
+                console.error(e);
+                list.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-red-400">Erreur de chargement.</td></tr>`;
+            }
+        }
+
+        // Fetch current user role
+        let currentUserRole = null;
+        async function fetchRole() {
+            try {
+                const res = await fetch('/api/v1/auth/me', { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (res.ok) {
+                    const u = await res.json();
+                    currentUserRole = u.role;
+                }
+            } catch (e) { }
+        }
+        fetchRole();
+
+        window.viewPatient = async (id) => {
+            currentPatientId = id;
+            try {
+                const res = await fetch(`/api/v1/patients/${id}`, { headers: { 'Authorization': `Bearer ${authToken}` } });
+                if (!res.ok) throw new Error("Err");
+                const p = await res.json();
+
+                document.getElementById('detail-name').textContent = `${p.first_name} ${p.last_name}`;
+                document.getElementById('detail-phone').innerHTML = `<i class="fas fa-phone mr-1"></i> ${p.phone || 'N/A'}`;
+                document.getElementById('detail-email').innerHTML = `<i class="fas fa-envelope mr-1"></i> ${p.email || 'N/A'}`;
+
+                // Privacy Check
+                const isSecretary = currentUserRole === 'user';
+
+                if (isSecretary) {
+                    document.getElementById('detail-history').parentElement.classList.add('hidden');
+                    document.getElementById('detail-files').parentElement.classList.add('hidden');
+                } else {
+                    document.getElementById('detail-history').parentElement.classList.remove('hidden');
+                    document.getElementById('detail-files').parentElement.classList.remove('hidden');
+                    document.getElementById('detail-history').textContent = p.medical_history || 'Aucun historique.';
+                    renderFiles(p.files || []);
+                }
+
+                detailModal.classList.remove('hidden');
+            } catch (e) { console.error(e); alert("Impossible de charger le patient"); }
+        };
+
+        function renderFiles(files) {
+            const container = document.getElementById('detail-files');
+            if (files.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 italic">Aucun document.</p>`;
+                return;
+            }
+            container.innerHTML = files.map(f => `
+                <a href="${f.file_path}" target="_blank" class="block bg-slate-50 hover:bg-slate-100 p-2 rounded border border-slate-200 flex items-center gap-2 group">
+                    <i class="fas fa-file-medical text-indigo-500"></i>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-sm font-medium text-slate-700 truncate">${f.file_name}</p>
+                        <p class="text-xs text-slate-400">${new Date(f.uploaded_at).toLocaleDateString()}</p>
+                    </div>
+                    <i class="fas fa-external-link-alt text-slate-300 group-hover:text-indigo-500"></i>
+                </a>
+            `).join('');
+        }
+
+        window.triggerFileUpload = () => document.getElementById('file-upload-input').click();
+
+        window.uploadFile = async (file) => {
+            if (!file || !currentPatientId) return;
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // Show loading state?
+                const res = await fetch(`/api/v1/patients/${currentPatientId}/files`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${authToken}` },
+                    body: formData
+                });
+                if (res.ok) {
+                    const updatedPatient = await res.json();
+                    renderFiles(updatedPatient.files);
+                    alert("Fichier ajouté !");
+                } else {
+                    alert("Erreur upload");
+                }
+            } catch (e) { console.error(e); alert("Erreur upload"); }
+            // Reset input
+            document.getElementById('file-upload-input').value = '';
+        };
+
+        // Create Patient
+        if (form) {
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                const json = Object.fromEntries(new FormData(e.target).entries());
+
+                try {
+                    const res = await fetch('/api/v1/patients/', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
+                        body: JSON.stringify(json)
+                    });
+                    if (res.ok) {
+                        close();
+                        e.target.reset();
+                        loadPatients();
+                        alert("Patient créé avec succès !");
+                    } else {
+                        const err = await res.json();
+                        alert("Erreur: " + (err.detail || "Inconnue"));
+                    }
+                } catch (e) { console.error(e); alert("Erreur réseau"); }
+            };
+        }
+
+        // Init
+        loadPatients();
+    })();
+</script>
+{% endblock %}

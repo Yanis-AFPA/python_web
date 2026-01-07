@@ -3,9 +3,10 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.routers import events, auth, users
+from app.routers import events, auth, users, patients, dashboard
 from app.db.session import engine, AsyncSessionLocal
 from app.db.base_class import Base
+from app.models import user, event, patient # Ensure models are loaded
 from app.db.init_db import init_db
 
 # Create tables on startup (for prototype simplicity)
@@ -42,6 +43,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(auth.router, prefix=f"{settings.API_V1_STR}/auth", tags=["auth"])
 app.include_router(users.router, prefix=f"{settings.API_V1_STR}/users", tags=["users"])
 app.include_router(events.router, prefix="/events", tags=["events"])
+app.include_router(patients.router, prefix="/api/v1/patients", tags=["patients"])
+app.include_router(dashboard.router, prefix="/api/v1/dashboard", tags=["dashboard"])
 
 # Templates (Simple viewing)
 templates = Jinja2Templates(directory="templates")
@@ -57,6 +60,14 @@ async def login_page(request: Request):
 @app.get("/settings")
 async def settings_page(request: Request):
     return templates.TemplateResponse("settings.html", {"request": request})
+
+@app.get("/patients")
+async def patients_page(request: Request):
+    return templates.TemplateResponse("patients.html", {"request": request})
+
+@app.get("/dashboard")
+async def dashboard_page(request: Request):
+    return templates.TemplateResponse("dashboard.html", {"request": request})
 
 @app.get("/")
 async def index(request: Request):

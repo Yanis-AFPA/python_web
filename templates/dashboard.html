@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}MediTrack - Dashboard{% endblock %}
+
+{% block header_title %}Tableau de Bord{% endblock %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Stats Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        <!-- Patients Card -->
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-full bg-teal-100 text-teal-600 flex items-center justify-center text-xl">
+                <i class="fas fa-user-injured"></i>
+            </div>
+            <div>
+                <p class="text-sm text-slate-500 font-medium">Patients Total</p>
+                <h3 class="text-2xl font-bold text-slate-800" id="stat-patients">-</h3>
+            </div>
+        </div>
+
+        <!-- Appointments Today -->
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl">
+                <i class="fas fa-calendar-day"></i>
+            </div>
+            <div>
+                <p class="text-sm text-slate-500 font-medium">Rendez-vous Aujourd'hui</p>
+                <h3 class="text-2xl font-bold text-slate-800" id="stat-today">-</h3>
+            </div>
+        </div>
+
+        <!-- Pending Approvals -->
+        <div class="bg-white rounded-xl p-6 shadow-sm border border-slate-200 flex items-center gap-4">
+            <div class="w-12 h-12 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xl">
+                <i class="fas fa-clock"></i>
+            </div>
+            <div>
+                <p class="text-sm text-slate-500 font-medium">En Attente</p>
+                <h3 class="text-2xl font-bold text-slate-800" id="stat-pending">-</h3>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div
+            class="bg-gradient-to-br from-teal-500 to-teal-700 rounded-xl p-6 text-white shadow-lg relative overflow-hidden group">
+            <div class="relative z-10">
+                <h3 class="text-xl font-bold mb-2">Nouveau Patient ?</h3>
+                <p class="text-teal-100 mb-4 text-sm">Créez un dossier patient rapidement.</p>
+                <a href="/patients"
+                    class="inline-block bg-white text-teal-600 px-4 py-2 rounded-lg font-bold text-sm hover:bg-teal-50 transition-colors">Gérer
+                    les patients</a>
+            </div>
+            <i
+                class="fas fa-user-plus absolute -bottom-4 -right-4 text-8xl text-white/10 group-hover:scale-110 transition-transform"></i>
+        </div>
+
+        <div
+            class="bg-gradient-to-br from-slate-700 to-slate-900 rounded-xl p-6 text-white shadow-lg relative overflow-hidden group">
+            <div class="relative z-10">
+                <h3 class="text-xl font-bold mb-2">Planning</h3>
+                <p class="text-slate-300 mb-4 text-sm">Consultez l'agenda de la clinique.</p>
+                <a href="/calendar"
+                    class="inline-block bg-white text-slate-900 px-4 py-2 rounded-lg font-bold text-sm hover:bg-slate-100 transition-colors">Voir
+                    Calendrier</a>
+            </div>
+            <i
+                class="fas fa-calendar-check absolute -bottom-4 -right-4 text-8xl text-white/10 group-hover:scale-110 transition-transform"></i>
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    (() => {
+        const token = localStorage.getItem('token');
+
+        async function loadStats() {
+            try {
+                const res = await fetch('/api/v1/dashboard/stats', {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    document.getElementById('stat-patients').textContent = data.total_patients;
+                    document.getElementById('stat-today').textContent = data.appointments_today;
+                    document.getElementById('stat-pending').textContent = data.pending_approvals;
+                }
+            } catch (e) {
+                console.error("Dashboard error", e);
+            }
+        }
+
+        loadStats();
+    })();
+</script>
+{% endblock %}

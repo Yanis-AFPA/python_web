@@ -43,6 +43,14 @@ async def read_users(
     result = await db.execute(select(User).offset(skip).limit(limit))
     return result.scalars().all()
 
+@router.get("/doctors", response_model=List[UserResponse])
+async def read_doctors(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(allow_any_auth)
+):
+    result = await db.execute(select(User).where(User.role == UserRole.MANAGER))
+    return result.scalars().all()
+
 @router.post("/", response_model=UserResponse)
 async def create_user(
     user_in: UserCreate,
