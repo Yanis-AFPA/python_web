@@ -205,9 +205,9 @@
                         doctors.forEach(d => {
                             const opt = document.createElement('option');
                             opt.value = d.id;
-                            // Fallback if name is null
-                            let label = `Dr. ${d.last_name || ''} ${d.first_name || ''}`.trim();
-                            if (label === 'Dr.') label = `Dr. ${d.email}`; // Fallback to email
+                            // Label construction: First Last
+                            let label = `${d.first_name || ''} ${d.last_name || ''}`.trim();
+                            if (!label) label = d.email;
                             if (d.specialty) label += ` (${d.specialty})`;
 
                             opt.textContent = label;
@@ -260,22 +260,37 @@
                         if (!data) return; // Redirected
                         // Map backend events to FullCalendar format
                         const events = data.map(event => {
-                            let color = '#3b82f6'; // Default Blue (Private/Standard)
+                            // 1. Color Coding by Type
+                            let color = '#3b82f6'; // Default
                             let borderColor = '#2563eb';
 
-                            if (event.is_public) {
-                                if (event.is_approved) {
-                                    color = '#10b981'; // Green (Approved Public)
-                                    borderColor = '#059669';
-                                } else {
-                                    color = '#f59e0b'; // Orange (Pending Public)
-                                    borderColor = '#d97706';
-                                }
+                            switch (event.event_type) {
+                                case 'consultation': color = '#3b82f6'; borderColor = '#2563eb'; break; // Blue
+                                case 'surgery': color = '#ef4444'; borderColor = '#dc2626'; break; // Red
+                                case 'meeting': color = '#a855f7'; borderColor = '#9333ea'; break; // Purple
+                                case 'other': color = '#64748b'; borderColor = '#475569'; break; // Slate
+                            }
+
+                            // 2. Title Logic
+                            // Secretary: "Dr Name - Patient Name"
+                            // Doctor: "Patient Name"
+                            let title = event.title || 'Sans titre';
+
+                            // Ensure objects exist before accessing
+                            const pName = event.patient ? `${event.patient.last_name} ${event.patient.first_name}` : 'Aucun patient';
+
+                            if (currentUser.role === 'user' || currentUser.role === 'admin' || currentUser.role === 'super_admin') {
+                                // Secretary view
+                                const dName = event.owner ? `${event.owner.first_name} ${event.owner.last_name}` : 'Non assigné';
+                                title = `${dName} - ${pName}`;
+                            } else if (currentUser.role === 'manager') {
+                                // Doctor view
+                                title = pName;
                             }
 
                             return {
                                 id: event.id,
-                                title: event.title,
+                                title: title,
                                 start: event.start_date,
                                 end: event.end_date,
                                 backgroundColor: color,
@@ -286,8 +301,9 @@
                                     is_public: event.is_public,
                                     is_approved: event.is_approved,
                                     owner_id: event.owner_id,
-                                    event_type: event.event_type, // Added event_type
-                                    patient: event.patient // Added patient
+                                    event_type: event.event_type,
+                                    patient: event.patient,
+                                    owner: event.owner
                                 }
                             };
                         });
