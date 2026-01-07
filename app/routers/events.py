@@ -8,7 +8,7 @@ from datetime import datetime
 from app.db.session import get_db
 from app.models.event import Event as EventModel, EventFile as EventFileModel
 from app.models.user import User, UserRole
-from app.schemas.event import Event as EventSchema, EventCreate
+from app.schemas.event import Event as EventSchema, EventCreate, EventUpdate
 from app.services.file_service import LocalFileService
 from app.core.deps import get_current_active_user
 from app.core.rbac import RoleChecker
@@ -27,6 +27,8 @@ allow_admin = RoleChecker([UserRole.SUPER_ADMIN, UserRole.ADMIN])
 async def read_events(
     skip: int = 0,
     limit: int = 100,
+    patient_name: Optional[str] = None,
+    event_type: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(allow_any_authenticated)
 ):
@@ -46,6 +48,21 @@ async def read_events(
     elif current_user.role == UserRole.MANAGER:
         query = query.where(EventModel.owner_id == current_user.id)
     
+    # --- Filters ---
+    if event_type:
+        query = query.where(EventModel.event_type == event_type)
+        
+    if patient_name:
+        # Case insensitive search on First OR Last name
+        # We need join if patient relationship is not eager loaded in query structure for WHERE clause?
+        # Typically select(Event).join(Event.patient)
+        query = query.join(EventModel.patient).where(
+            or_(
+                PatientModel.last_name.ilike(f"%{patient_name}%"),
+                PatientModel.first_name.ilike(f"%{patient_name}%")
+            )
+        )
+
     result = await db.execute(query.offset(skip).limit(limit))
     events = result.scalars().all()
     
@@ -174,8 +191,8 @@ async def delete_event(
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
         
-    # RBAC: Admin/Manager or Owner can delete
-    if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER] and event.owner_id != current_user.id:
+    # RBAC: Admin/Manager or Owner or Secretary can delete
+    if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER, UserRole.USER] and event.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
         
     await db.delete(event)
@@ -207,3 +224,69 @@ async def approve_event(
     event = result.scalar_one()
     
     return event
+
+@router.put("/{event_id}", response_model=EventSchema)
+async def update_event(
+    event_id: int,
+    event_in: EventUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(allow_any_authenticated)
+):
+    # Fetch existing
+    result = await db.execute(select(EventModel).where(EventModel.id == event_id))
+    db_event = result.scalar_one_or_none()
+    
+    if not db_event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    # RBAC: Only Owner or Manager/Admin/Secretary can update
+    if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER, UserRole.USER] and db_event.owner_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    # Update fields
+    update_data = event_in.model_dump(exclude_unset=True)
+    
+    # Conflict Check if dates changed
+    if "start_date" in update_data or "end_date" in update_data:
+        new_start = update_data.get("start_date", db_event.start_date)
+        new_end = update_data.get("end_date", db_event.end_date)
+        
+        # FIX: Ensure dates are naive (remove timezone) to match DB
+        if new_start.tzinfo is not None:
+            new_start = new_start.replace(tzinfo=None)
+        if new_end.tzinfo is not None:
+            new_end = new_end.replace(tzinfo=None)
+
+        # Update in dictionary for setattr later
+        if "start_date" in update_data: update_data["start_date"] = new_start
+        if "end_date" in update_data: update_data["end_date"] = new_end
+        
+        target_owner = update_data.get("owner_id", db_event.owner_id)
+        
+        if target_owner:
+            conflict_query = select(EventModel).where(
+                EventModel.owner_id == target_owner,
+                EventModel.id != event_id, # Exclude self
+                EventModel.start_date < new_end,
+                EventModel.end_date > new_start
+            )
+            result = await db.execute(conflict_query)
+            if result.scalars().first():
+                 raise HTTPException(status_code=400, detail="Docteur indisponible sur ce créneau")
+
+    for field, value in update_data.items():
+        setattr(db_event, field, value)
+
+    db.add(db_event)
+    await db.commit()
+    await db.refresh(db_event)
+    
+    # Eager load for response
+    result = await db.execute(select(EventModel).options(
+        selectinload(EventModel.files), 
+        selectinload(EventModel.patient).selectinload(PatientModel.files),
+        selectinload(EventModel.owner)
+    ).where(EventModel.id == db_event.id))
+    db_event = result.scalar_one()
+    
+    return db_event

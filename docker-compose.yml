@@ -10,7 +10,9 @@ services:
       - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/calendar_db
       - BACKEND_CORS_ORIGINS=["http://localhost:8001","http://127.0.0.1:8001"]
     volumes:
-      - ./static/uploads:/app/static/uploads # Persist uploads
+      - .:/app # Mount source code for live updates
+      - ./static/uploads:/app/static/uploads # Persist uploads (optional if inside .)
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   db:
     image: postgres:15

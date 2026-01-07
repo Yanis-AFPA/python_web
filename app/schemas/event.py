@@ -27,6 +27,16 @@ class EventBase(BaseModel):
 class EventCreate(EventBase):
     pass
 
+class EventUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    start_date: Optional[datetime] = None
+    end_date: Optional[datetime] = None
+    is_public: Optional[bool] = None
+    event_type: Optional[str] = None
+    patient_id: Optional[int] = None
+    owner_id: Optional[int] = None
+
 class Event(EventBase):
     id: int
     is_approved: bool # Read only
