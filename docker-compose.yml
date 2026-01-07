@@ -1,0 +1,33 @@
+services:
+  app:
+    build: .
+    ports:
+      - "8001:8000" # Mapping 8001 on host to 8000 in container (avoiding port 8000 conflict)
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@db:5432/calendar_db
+      - BACKEND_CORS_ORIGINS=["http://localhost:8001","http://127.0.0.1:8001"]
+    volumes:
+      - ./static/uploads:/app/static/uploads # Persist uploads
+
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=calendar_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
