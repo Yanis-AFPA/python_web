@@ -16,7 +16,7 @@ class EventFile(EventFileBase):
         from_attributes = True
 
 class EventBase(BaseModel):
-    title: str
+    title: Optional[str] = None
     description: Optional[str] = None
     start_date: datetime
     end_date: datetime
@@ -25,7 +25,7 @@ class EventBase(BaseModel):
     patient_id: Optional[int] = None
 
 class EventCreate(EventBase):
-    pass
+    end_date: Optional[datetime] = None
 
 class EventUpdate(BaseModel):
     title: Optional[str] = None

@@ -52,7 +52,7 @@
                 <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                     <i class="fas fa-search text-slate-400"></i>
                 </div>
-                <input type="text" id="searchPatient" placeholder="Rechercher un patient..."
+                <input type="text" id="searchDoctor" placeholder="Rechercher un médecin..."
                     class="block w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg leading-5 bg-white placeholder-slate-500 focus:outline-none focus:placeholder-slate-400 focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm transition duration-150 ease-in-out">
             </div>
 
@@ -66,6 +66,12 @@
             </select>
         </div>
 
+        <button id="btn-print" onclick="window.print()"
+            class="bg-slate-600 hover:bg-slate-700 text-white font-semibold py-2 px-6 rounded-lg shadow-lg shadow-slate-500/30 transition-all flex items-center gap-2 transform hover:scale-105 whitespace-nowrap">
+            <i class="fas fa-print"></i>
+            <span>Imprimer</span>
+        </button>
+
         <button id="btn-add-event"
             class="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-6 rounded-lg shadow-lg shadow-indigo-500/30 transition-all flex items-center gap-2 transform hover:scale-105 whitespace-nowrap">
             <i class="fas fa-plus"></i>
@@ -75,11 +81,57 @@
 
     <!-- Calendar Card -->
     <div
-        class="bg-white rounded-xl shadow-lg border border-slate-100 p-6 flex-1 relative overflow-hidden flex flex-col">
+        class="bg-white rounded-xl shadow-lg border border-slate-100 p-6 flex-1 relative overflow-hidden flex flex-col print:shadow-none print:border-none print:p-0">
         <div id='calendar' class="flex-1"></div>
     </div>
 
 </div>
+
+<!-- Print Styles -->
+<style>
+    @media print {
+
+        /* Hide everything except calendar */
+        body * {
+            visibility: hidden;
+        }
+
+        #calendar,
+        #calendar * {
+            visibility: visible;
+        }
+
+        /* Position calendar at top left */
+        #calendar {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* Specific adjustments for FullCalendar print */
+        .fc-header-toolbar {
+            display: none !important;
+            /* Hide navigation buttons */
+        }
+
+        .fc-toolbar-title {
+            display: block !important;
+            /* Keep title (Month/Year) */
+            visibility: visible !important;
+            font-size: 24pt !important;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        /* Ensure events have color */
+        .fc-event {
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+        }
+    }
+</style>
 
 <!-- Modal -->
 <div id="event-modal"
@@ -94,10 +146,11 @@
         </div>
 
         <form id="event-form" class="p-6 space-y-5">
-            <div>
+            <!-- Title (Optional/Hidden for Consultation) -->
+            <div class="hidden">
                 <label class="block text-sm font-medium text-slate-700 mb-1">Titre</label>
-                <input type="text" name="title" id="eventTitle" required
-                    class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm">
+                <input type="text" name="title"
+                    class="w-full rounded-md border-slate-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm">
             </div>
 
             <div class="grid grid-cols-2 gap-4">
@@ -138,8 +191,8 @@
                         class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm">
                 </div>
                 <div>
-                    <label class="block text-sm font-medium text-slate-700 mb-1">Fin</label>
-                    <input type="datetime-local" name="end_date" id="eventEnd" required
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Fin (Optionnel, +1h par défaut)</label>
+                    <input type="datetime-local" name="end_date" id="eventEnd"
                         class="w-full rounded-md border-slate-300 shadow-sm focus:border-teal-500 focus:ring-teal-500 sm:text-sm">
                 </div>
             </div>
@@ -238,18 +291,20 @@
                     }
                 }
 
-                // Hide "Meeting" option for Secretaries
-                const typeSelect = document.getElementById('eventType');
-                for (let i = 0; i < typeSelect.options.length; i++) {
-                    if (typeSelect.options[i].value === 'meeting') {
-                        typeSelect.options[i].disabled = true;
-                        typeSelect.options[i].hidden = true;
+                // Hide "Meeting" option ONLY for Secretaries (user role)
+                if (currentUser.role === 'user') {
+                    const typeSelect = document.getElementById('eventType');
+                    for (let i = 0; i < typeSelect.options.length; i++) {
+                        if (typeSelect.options[i].value === 'meeting') {
+                            typeSelect.options[i].disabled = true;
+                            typeSelect.options[i].hidden = true;
+                        }
                     }
-                }
 
-                // Hide File Upload for Secretaries
-                const fileInputDiv = document.getElementById('field-file-upload');
-                if (fileInputDiv) fileInputDiv.classList.add('hidden');
+                    // Hide File Upload for Secretaries
+                    const fileInputDiv = document.getElementById('field-file-upload');
+                    if (fileInputDiv) fileInputDiv.classList.add('hidden');
+                }
             }
         } catch (e) { console.error("Role check failed", e); }
 
@@ -265,6 +320,13 @@
             locale: 'fr',
             height: '100%',
             editable: true, // Enable Drag & Drop
+            // Fix: Disable Drag & Drop in Month View to prevent scheduling errors
+            eventAllow: function (dropInfo, draggedEvent) {
+                if (calendar.view.type === 'dayGridMonth') {
+                    return false;
+                }
+                return true;
+            },
             eventDrop: function (info) {
                 updateEventDates(info.event, info.revert);
             },
@@ -275,12 +337,12 @@
                 const token = localStorage.getItem('token');
 
                 // Get Filter Values
-                const patientName = document.getElementById('searchPatient').value;
+                const doctorName = document.getElementById('searchDoctor').value;
                 const eventType = document.getElementById('filterType').value;
 
                 // Build Query Params
                 const params = new URLSearchParams();
-                if (patientName) params.append('patient_name', patientName);
+                if (doctorName) params.append('doctor_name', doctorName);
                 if (eventType) params.append('event_type', eventType);
                 // Note: FullCalendar sends start/end automatically in info (optional if backend filters by range, but here we load all for now or paginated)
                 // If backend supports start/end filtering (it doesn't explicitly in my code yet, it resets to all), 
@@ -320,18 +382,30 @@
                             // 2. Title Logic
                             // Secretary: "Dr Name - Patient Name"
                             // Doctor: "Patient Name"
-                            let title = event.title || 'Sans titre';
+                            // Default Dynamic Title Logic
+                            let title = event.title;
+                            const pName = event.patient ? `${event.patient.first_name} ${event.patient.last_name}` : 'Patient Inconnu';
 
-                            // Ensure objects exist before accessing
-                            const pName = event.patient ? `${event.patient.last_name} ${event.patient.first_name}` : 'Aucun patient';
-
-                            if (currentUser.role === 'user' || currentUser.role === 'admin' || currentUser.role === 'super_admin') {
+                            if (event.event_type === 'meeting') {
+                                title = "Réunion";
+                            } else if (currentUser.role === 'user' || currentUser.role === 'admin' || currentUser.role === 'super_admin') {
                                 // Secretary view
                                 const dName = event.owner ? `${event.owner.first_name} ${event.owner.last_name}` : 'Non assigné';
                                 title = `${dName} - ${pName}`;
                             } else if (currentUser.role === 'manager') {
                                 // Doctor view
                                 title = pName;
+                            }
+
+                            // --- Permission Logic for Editable ---
+                            // Default true, but restrict specific cases
+                            let isEditable = true;
+
+                            // Restrict 'meeting' updates to Admin/SuperAdmin only
+                            if (event.event_type === 'meeting') {
+                                if (!['admin', 'super_admin'].includes(currentUser.role)) {
+                                    isEditable = false;
+                                }
                             }
 
                             return {
@@ -341,6 +415,7 @@
                                 end: event.end_date,
                                 backgroundColor: color,
                                 borderColor: borderColor,
+                                editable: isEditable, // Override global editable
                                 extendedProps: {
                                     description: event.description,
                                     files: event.files,
@@ -387,14 +462,51 @@
         });
         calendar.render();
 
+        // --- Search & Filter Listeners ---
+        const searchInput = document.getElementById('searchDoctor');
+        const typeSelect = document.getElementById('filterType');
+
+        // Debounce search input
+        let timeout = null;
+        searchInput.addEventListener('input', () => {
+            clearTimeout(timeout);
+            timeout = setTimeout(() => {
+                calendar.refetchEvents();
+            }, 300);
+        });
+
+        typeSelect.addEventListener('change', () => {
+            calendar.refetchEvents();
+        });
+
+        // Helper: Get Local ISO String (Naive)
+        function toLocalISOString(date) {
+            const tzOffset = date.getTimezoneOffset() * 60000; // in milliseconds
+            return new Date(date - tzOffset).toISOString().slice(0, -1);
+        }
+
         // Helper: Update Event Dates via API
         async function updateEventDates(event, revertFunc) {
             const updates = {
-                start_date: event.start.toISOString(),
-                end_date: event.end ? event.end.toISOString() : event.start.toISOString() // FullCalendar end can be null for point events
+                start_date: toLocalISOString(event.start),
+                end_date: event.end ? toLocalISOString(event.end) : null
             };
 
+            // If end is null (e.g. after resize/drop sometimes), calculate +1h fallback or let backend handle?
+            // Backend handles "if end_date in update_data" -> replaces. If we send null, Pydantic might complain if not Optional?
+            // Schema EventUpdate end_date is Optional[datetime].
+            // If we send explicit null, it sets to null?
+            // DB end_date is nullable=False.
+            // Start is always present. End might be missing in FC event object if it's a timed event without explicit end?
+            // Usually FC timed events have end. If not, we should probably compute it.
+            if (!updates.end_date && event.start) {
+                const d = new Date(event.start);
+                d.setHours(d.getHours() + 1);
+                updates.end_date = toLocalISOString(d);
+            }
+
             try {
+                // Determine owner for permission check (though backend checks it too)
                 const res = await fetch(`/events/${event.id}`, {
                     method: 'PUT',
                     headers: {
@@ -427,6 +539,27 @@
         // --- Modal Logic ---
         const modal = document.getElementById('event-modal');
         const modalContent = document.getElementById('modal-content');
+        const endInput = document.getElementById('eventEnd');
+
+        // Auto-fill End Date (+1h) when Start changes
+        const startInput = document.getElementById('eventStart');
+        startInput.addEventListener('change', () => {
+            if (startInput.value) {
+                const d = new Date(startInput.value);
+                d.setHours(d.getHours() + 1);
+
+                // Manual format YYYY-MM-DDTHH:MM
+                const pad = (n) => n < 10 ? '0' + n : n;
+                const iso = d.getFullYear() + '-' +
+                    pad(d.getMonth() + 1) + '-' +
+                    pad(d.getDate()) + 'T' +
+                    pad(d.getHours()) + ':' +
+                    pad(d.getMinutes());
+
+                endInput.value = iso;
+            }
+        });
+
         const btnAdd = document.getElementById('btn-add-event');
         const btnClose = document.getElementById('btn-close-modal');
         const form = document.getElementById('event-form');
@@ -494,10 +627,15 @@
             const isManager = currentUser && ['admin', 'manager', 'super_admin'].includes(currentUser.role);
             // Secretary (user) can also manage events (delete/move), but maybe not "Approve" (logic specific)
             // Logic: Secretaries can Delete.
-            const canDelete = currentUser && (
+            let canDelete = currentUser && (
                 currentUser.id === props.owner_id ||
                 ['admin', 'manager', 'super_admin', 'user'].includes(currentUser.role)
             );
+
+            // Special Restriction: Only Admin/SuperAdmin can delete meetings
+            if (props.event_type === 'meeting' && !['admin', 'super_admin'].includes(currentUser.role)) {
+                canDelete = false;
+            }
 
             const canApprove = isManager && props.is_public && !props.is_approved;
 

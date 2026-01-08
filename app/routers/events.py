@@ -27,7 +27,7 @@ allow_admin = RoleChecker([UserRole.SUPER_ADMIN, UserRole.ADMIN])
 async def read_events(
     skip: int = 0,
     limit: int = 100,
-    patient_name: Optional[str] = None,
+    doctor_name: Optional[str] = None,
     event_type: Optional[str] = None,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(allow_any_authenticated)
@@ -44,22 +44,25 @@ async def read_events(
     if current_user.role in [UserRole.USER, UserRole.ADMIN, UserRole.SUPER_ADMIN]:
         pass # No filter, see all
         
-    # 2. Doctor (MANAGER): See ONLY their own events (assigned to them)
+    # 2. Doctor (MANAGER): See ONLY their own events OR Meetings (Global)
     elif current_user.role == UserRole.MANAGER:
-        query = query.where(EventModel.owner_id == current_user.id)
+        query = query.where(
+            or_(
+                EventModel.owner_id == current_user.id,
+                EventModel.event_type == "meeting"
+            )
+        )
     
     # --- Filters ---
     if event_type:
         query = query.where(EventModel.event_type == event_type)
         
-    if patient_name:
-        # Case insensitive search on First OR Last name
-        # We need join if patient relationship is not eager loaded in query structure for WHERE clause?
-        # Typically select(Event).join(Event.patient)
-        query = query.join(EventModel.patient).where(
+    if doctor_name:
+        # Case insensitive search on Doctor (Owner) First OR Last name
+        query = query.join(EventModel.owner).where(
             or_(
-                PatientModel.last_name.ilike(f"%{patient_name}%"),
-                PatientModel.first_name.ilike(f"%{patient_name}%")
+                User.last_name.ilike(f"%{doctor_name}%"),
+                User.first_name.ilike(f"%{doctor_name}%")
             )
         )
 
@@ -85,9 +88,9 @@ async def read_events(
 
 @router.post("/", response_model=EventSchema)
 async def create_event(
-    title: str = Form(...),
+    title: Optional[str] = Form(None),
     start_date: datetime = Form(...),
-    end_date: datetime = Form(...),
+    end_date: Optional[datetime] = Form(None),
     description: Optional[str] = Form(None),
     is_public: bool = Form(False),
     event_type: str = Form("consultation"),
@@ -97,6 +100,35 @@ async def create_event(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
+    if not end_date:
+        from datetime import timedelta
+        end_date = start_date + timedelta(hours=1)
+        
+    # Default Title Generation
+    if not title:
+        # We need patient name for a good title
+        patient_name = "Patient Inconnu"
+        if patient_id:
+            # We could fetch patient, but simpler to use generic "Consultation" and let frontend display handles proper naming
+            # Actually, let's just save a generic Type title, because frontend dynamic display overrides it anyway?
+            # Frontend currently uses: `${dName} - ${pName}` or just `${pName}`
+            # But the 'title' field in DB is still used as fallback or main source.
+            # Let's try to fetch patient name if possible, OR just use "Type"
+            # To fetch patient effectively we need a query.
+            # Let's just use the event_type as title for now, simple fallback.
+            if event_type == "meeting":
+                title = "Réunion"
+            else:
+                title = event_type.capitalize()
+            
+            if patient_id:
+                 # Fetch patient to make it better?
+                 # It's an async operation, cheaply doable.
+                 p_res = await db.execute(select(PatientModel).where(PatientModel.id == patient_id))
+                 p = p_res.scalar_one_or_none()
+                 if p:
+                     title = f"{title} - {p.first_name} {p.last_name}"
+
     event_data = EventCreate(
         title=title, 
         start_date=start_date, 
@@ -195,6 +227,10 @@ async def delete_event(
     if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER, UserRole.USER] and event.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
         
+    # Special Rule: Only Admin/SuperAdmin can delete 'meeting'
+    if event.event_type == "meeting" and current_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+         raise HTTPException(status_code=403, detail="Seuls les directeurs peuvent supprimer des réunions")
+
     await db.delete(event)
     await db.commit()
     return None
@@ -242,6 +278,10 @@ async def update_event(
     # RBAC: Only Owner or Manager/Admin/Secretary can update
     if current_user.role not in [UserRole.ADMIN, UserRole.MANAGER, UserRole.USER] and db_event.owner_id != current_user.id:
         raise HTTPException(status_code=403, detail="Not enough permissions")
+
+    # Special Rule: Only Admin/SuperAdmin can update 'meeting'
+    if db_event.event_type == "meeting" and current_user.role not in [UserRole.ADMIN, UserRole.SUPER_ADMIN]:
+         raise HTTPException(status_code=403, detail="Seuls les directeurs peuvent modifier des réunions")
 
     # Update fields
     update_data = event_in.model_dump(exclude_unset=True)
